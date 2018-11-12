@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 use std::str::Chars;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LexedLine<'a> {
     tokens: Vec<Token>,
     raw: &'a str,
@@ -28,19 +28,28 @@ pub enum Token {
 }
 
 impl Token {
-    fn extract_ident(chars: &mut Peekable<Chars>) -> Token {
+    fn extract_ident(chars: &mut Peekable<Chars>) -> Result<Token, ()> {
         let mut result = String::new();
-        result.push(chars.next().unwrap());
+        let mut curr_char = 0;
         while let Some(c) = chars.peek() {
             match c {
-                'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => {
+                'a'...'z' | 'A'...'Z' | '_' => {
                     result.push(*c);
                     chars.next();
+                    curr_char += 1;
+                }
+                '0'...'9' if curr_char > 0 => {
+                    result.push(*c);
+                    chars.next();
+                    curr_char += 1;
                 }
                 _ => break,
             };
         }
-        return Token::Ident(result);
+        match result.len() > 0 {
+            true => Ok(Token::Ident(result)),
+            false => Err(()),
+        }
     }
 
     fn extract_number(chars: &mut Peekable<Chars>) -> Result<Token, ()> {
@@ -48,22 +57,22 @@ impl Token {
         let mut val = 0;
         let mut num_chars = 0;
         let mut num_literal = String::new();
-        let mut looks_hexy = false;
-        let mut looks_biny = false;
+        let mut is_hex = false;
+        let mut is_bin = false;
         while let Some(c) = chars.peek() {
             num_literal.push(*c);
             match c {
                 'x' | 'X' if num_chars == 1 && starts_with_zero => {
-                    looks_hexy = true;
+                    is_hex = true;
                 }
                 'b' | 'B' if num_chars == 1 && starts_with_zero => {
-                    looks_biny = true;
+                    is_bin = true;
                 }
                 'a'...'f' | 'A'...'F' | '0'...'9' => {
-                    if looks_hexy {
+                    if is_hex {
                         let parsed = from_hex_digit(*c)?;
                         val = val * 16 + parsed;
-                    } else if looks_biny {
+                    } else if is_bin {
                         let parsed = from_bin_digit(*c)?;
                         val = val * 2 + parsed;
                     } else {
@@ -77,7 +86,7 @@ impl Token {
             chars.next();
         }
 
-        if (looks_hexy || looks_biny) && num_chars <= 2 {
+        if (is_hex || is_bin) && num_chars <= 2 {
             return Err(());
         }
         Ok(Token::Number(val))
@@ -141,7 +150,7 @@ fn lex_line<'a>(line: &'a str) -> Result<LexedLine<'a>, ()> {
             }
             '0'...'9' => tokens.push(Token::extract_number(&mut chars)?),
             'a'...'z' | 'A'...'Z' | '_' => {
-                tokens.push(Token::extract_ident(&mut chars))
+                tokens.push(Token::extract_ident(&mut chars)?)
             }
             ';' => {
                 // begins a comment which extends to end of line
