@@ -379,7 +379,17 @@ type ParseResult = Result<ParsedLine, ParseError>;
 type PeekableTokens<'a> = Peekable<Iter<'a, Token>>;
 type LexedLines<'a, 'b> = Iter<'a, LexedLine<'b>>;
 
-pub fn parse(lines: &mut LexedLines) -> Result<Vec<ParsedLine>, ParseError> {
+pub struct Parsed {
+    lines: Vec<ParsedLine>,
+}
+
+impl Parsed {
+    pub fn get_lines(&self) -> &[ParsedLine] {
+        &self.lines
+    }
+}
+
+pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
     let mut results = vec![];
     for (idx, line) in lines.enumerate() {
         let parsed = parse_line(&mut line.get_tokens().iter().peekable());
@@ -400,7 +410,7 @@ pub fn parse(lines: &mut LexedLines) -> Result<Vec<ParsedLine>, ParseError> {
             }
         }
     }
-    Ok(results)
+    Ok(Parsed { lines: results })
 }
 
 fn parse_line(line: &mut PeekableTokens) -> ParseResult {
