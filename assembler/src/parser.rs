@@ -358,7 +358,7 @@ impl Address {
 }
 
 #[derive(Debug)]
-pub struct Number(u16);
+pub struct Number(pub u16);
 
 impl Number {
     fn parse(tokens: &mut PeekableTokens) -> Result<Number, ParseError> {
