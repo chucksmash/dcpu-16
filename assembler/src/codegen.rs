@@ -32,7 +32,7 @@ impl fmt::Display for Asm {
         let result = self
             .out
             .iter()
-            .map(|word| format!("{:x}", word))
+            .map(|word| format!("0x{:04x}", word))
             .collect::<Vec<String>>()
             .join(" ");
         write!(f, "{}", result)
