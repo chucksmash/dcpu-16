@@ -165,7 +165,7 @@ pub fn val_b_to_bits(val: &ValueB) -> (u16, Option<u16>) {
     (unshifted << SHIFT, next_word)
 }
 
-pub fn assemble(parsed: Parsed) -> Listing {
+pub fn generate_code(parsed: Parsed) -> Listing {
     let mut listing = Listing { lines: vec![] };
     for parsed_line in parsed.get_lines() {
         let asm = match parsed_line {
