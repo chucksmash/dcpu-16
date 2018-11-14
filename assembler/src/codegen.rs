@@ -17,11 +17,11 @@ pub struct Asm {
 impl Asm {
     pub fn new(op_word: u16, b_word: Option<u16>, a_word: Option<u16>) -> Asm {
         let mut asm = Asm { out: vec![op_word] };
-        if let Some(b) = b_word {
-            asm.out.push(b);
-        };
         if let Some(a) = a_word {
             asm.out.push(a);
+        };
+        if let Some(b) = b_word {
+            asm.out.push(b);
         };
         asm
     }
