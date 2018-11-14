@@ -89,15 +89,15 @@ pub fn instr_to_bits(line: &ParsedLine) -> u16 {
         ParsedLine::Special(code, _) => {
             use self::SpecialOpCode::*;
             match code {
-                Jsr => 0x01 << 5,
-                Int => 0x08 << 5,
-                Iag => 0x09 << 5,
-                Ias => 0x0a << 5,
-                Rfi => 0x0b << 5,
-                Iaq => 0x0c << 5,
-                Hwn => 0x10 << 5,
-                Hwq => 0x11 << 5,
-                Hwi => 0x12 << 5,
+                Jsr => 0x01,
+                Int => 0x08,
+                Iag => 0x09,
+                Ias => 0x0a,
+                Rfi => 0x0b,
+                Iaq => 0x0c,
+                Hwn => 0x10,
+                Hwq => 0x11,
+                Hwi => 0x12,
             }
         }
     }
@@ -130,7 +130,6 @@ pub fn addr_to_bits(addr: &Address) -> (u16, Option<u16>) {
 
 pub fn val_a_to_bits(val: &ValueA) -> (u16, Option<u16>) {
     use self::ValueA::*;
-    const SHIFT: usize = 10;
     let (unshifted, next_word) = match val {
         Reg(ref r) => (reg_to_bits(r), None),
         Addr(ref a) => addr_to_bits(a),
@@ -146,12 +145,11 @@ pub fn val_a_to_bits(val: &ValueA) -> (u16, Option<u16>) {
             _ => (0x1f, Some(*n)),
         },
     };
-    (unshifted << SHIFT, next_word)
+    (unshifted, next_word)
 }
 
 pub fn val_b_to_bits(val: &ValueB) -> (u16, Option<u16>) {
     use self::ValueB::*;
-    const SHIFT: usize = 10;
     let (unshifted, next_word) = match val {
         Reg(ref r) => (reg_to_bits(r), None),
         Addr(ref a) => addr_to_bits(a),
@@ -162,7 +160,7 @@ pub fn val_b_to_bits(val: &ValueB) -> (u16, Option<u16>) {
         // TODO: Pc?!?
         Ex => (0x1d, None),
     };
-    (unshifted << SHIFT, next_word)
+    (unshifted, next_word)
 }
 
 pub fn generate_code(parsed: Parsed) -> Listing {
@@ -173,15 +171,14 @@ pub fn generate_code(parsed: Parsed) -> Listing {
                 let code_bits = instr_to_bits(&parsed_line);
                 let (b_bits, b_word) = val_b_to_bits(&b);
                 let (a_bits, a_word) = val_a_to_bits(&a);
-                let op_bits = code_bits | b_bits | a_bits;
+                let op_bits = code_bits | (b_bits << 5) | (a_bits << 10);
                 Asm::new(op_bits, b_word, a_word)
             }
             ParsedLine::Special(code, a) => {
                 let code_bits = instr_to_bits(&parsed_line);
-                let (b_bits, b_word) = (0x0, None);
                 let (a_bits, a_word) = val_a_to_bits(&a);
-                let op_bits = code_bits | b_bits | a_bits;
-                Asm::new(op_bits, b_word, a_word)
+                let op_bits = (code_bits << 5) | (a_bits << 10);
+                Asm::new(op_bits, None, a_word)
             }
         };
         listing.lines.push(asm);
