@@ -119,7 +119,10 @@ fn from_bin_digit(c: char) -> Result<u16, ()> {
 pub fn lex<'a>(input: &'a str) -> Result<Vec<LexedLine<'a>>, ()> {
     let mut lines = vec![];
     for line in input.lines() {
-        lines.push(lex_line(line)?);
+        let lexed = lex_line(line)?;
+        if lexed.tokens.len() > 0 {
+            lines.push(lex_line(line)?);
+        }
     }
     Ok(lines)
 }
