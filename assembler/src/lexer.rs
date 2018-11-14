@@ -273,4 +273,37 @@ SET    [A + 0x12  ] , [POP]     ; this is a line";
         ]);
         assert_eq!(lex(input), expected);
     }
+
+    #[test]
+    fn lex_blank_lines() {
+        let input = "ADD A, 5
+
+; here's a comment
+  ; here's another
+SET [0x11], 5
+";
+        let expected = Ok(vec![
+            LexedLine {
+                tokens: vec![
+                    Token::Ident("ADD".to_string()),
+                    Token::Ident("A".to_string()),
+                    Token::Comma,
+                    Token::Number(5),
+                ],
+                raw: "ADD A, 5",
+            },
+            LexedLine {
+                tokens: vec![
+                    Token::Ident("SET".to_string()),
+                    Token::OpenBracket,
+                    Token::Number(17),
+                    Token::CloseBracket,
+                    Token::Comma,
+                    Token::Number(5),
+                ],
+                raw: "SET [0x11], 5",
+            },
+        ]);
+        assert_eq!(lex(input), expected);
+    }
 }
