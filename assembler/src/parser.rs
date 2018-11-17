@@ -172,26 +172,26 @@ impl SpecialOpCode {
 }
 
 #[derive(Debug)]
-pub enum OpCode {
+pub enum LineType {
     Basic(BasicOpCode),
     Special(SpecialOpCode),
 }
 
-impl OpCode {
-    fn from_str(name: &str) -> Result<OpCode, ParseError> {
+impl LineType {
+    fn from_str(name: &str) -> Result<LineType, ParseError> {
         let basic = BasicOpCode::from_str(name);
         let special = SpecialOpCode::from_str(name);
         match (basic, special) {
-            (Ok(b), Err(_)) => Ok(OpCode::Basic(b)),
-            (Err(_), Ok(s)) => Ok(OpCode::Special(s)),
+            (Ok(b), Err(_)) => Ok(LineType::Basic(b)),
+            (Err(_), Ok(s)) => Ok(LineType::Special(s)),
             (Err(_), Err(_)) => Err(ParseError::IllegalOpCode),
             (Ok(_), Ok(_)) => panic!("Impossible condition!"),
         }
     }
 
-    fn parse(tokens: &mut PeekableTokens) -> Result<OpCode, ParseError> {
+    fn parse(tokens: &mut PeekableTokens) -> Result<LineType, ParseError> {
         match tokens.next() {
-            Some(Token::Ident(name)) => OpCode::from_str(name),
+            Some(Token::Ident(name)) => LineType::from_str(name),
             _ => Err(ParseError::IllegalOpCode),
         }
     }
@@ -373,6 +373,7 @@ impl Number {
 pub enum ParsedLine {
     Basic(BasicOpCode, ValueB, ValueA),
     Special(SpecialOpCode, ValueA),
+    Label(String),
 }
 
 type ParseResult = Result<ParsedLine, ParseError>;
@@ -415,9 +416,10 @@ pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
 
 fn parse_line(line: &mut PeekableTokens) -> ParseResult {
     if let Some(Token::Ident(name)) = line.peek() {
-        match OpCode::from_str(&name)? {
-            OpCode::Basic(_) => parse_bop_line(line),
-            OpCode::Special(_) => parse_sop_line(line),
+        match LineType::from_str(&name) {
+            Ok(LineType::Basic(_)) => parse_bop_line(line),
+            Ok(LineType::Special(_)) => parse_sop_line(line),
+            Err(_) => parse_label_line(line),
         }
     } else {
         Err(ParseError::IllegalOpCode)
@@ -436,4 +438,23 @@ fn parse_sop_line(line: &mut PeekableTokens) -> ParseResult {
     let op_code = SpecialOpCode::parse(line)?;
     let a_value = ValueA::parse(line)?;
     Ok(ParsedLine::Special(op_code, a_value))
+}
+
+/// This is kind of the first place where our mapping of input lines to
+/// "lines" of parse tokens breaks down. To continue with our earlier
+/// pattern, we'd need five kinds of lines instead of two (basic/label,
+/// basic/no-label, special/label, special/no-label, no-line/label, with
+/// the sixth type no-line/no-label having already fallen out during lexing)
+///
+/// We're instead copping out and treating preceeding label definitions
+/// as their own line so that there are only three line types.
+fn parse_label_line(line: &mut PeekableTokens) -> ParseResult {
+    if let Token::Ident(name) = get!(line.next())? {
+        match get!(line.next())? {
+            Token::Colon => Ok(ParsedLine::Label(name.to_string())),
+            _ => Err(ParseError::UnexpectedToken),
+        }
+    } else {
+        Err(ParseError::UnexpectedToken)
+    }
 }
