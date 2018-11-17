@@ -100,6 +100,7 @@ pub fn instr_to_bits(line: &ParsedLine) -> u16 {
                 Hwi => 0x12,
             }
         }
+        ParsedLine::Label(_) => panic!("Learn to program, bub"),
     }
 }
 
@@ -166,22 +167,24 @@ pub fn val_b_to_bits(val: &ValueB) -> (u16, Option<u16>) {
 pub fn generate_code(parsed: Parsed) -> Listing {
     let mut listing = Listing { lines: vec![] };
     for parsed_line in parsed.get_lines() {
-        let asm = match parsed_line {
+        match parsed_line {
             ParsedLine::Basic(code, b, a) => {
                 let code_bits = instr_to_bits(&parsed_line);
                 let (b_bits, b_word) = val_b_to_bits(&b);
                 let (a_bits, a_word) = val_a_to_bits(&a);
                 let op_bits = code_bits | (b_bits << 5) | (a_bits << 10);
-                Asm::new(op_bits, b_word, a_word)
+                listing.lines.push(Asm::new(op_bits, b_word, a_word));
             }
             ParsedLine::Special(code, a) => {
                 let code_bits = instr_to_bits(&parsed_line);
                 let (a_bits, a_word) = val_a_to_bits(&a);
                 let op_bits = (code_bits << 5) | (a_bits << 10);
-                Asm::new(op_bits, None, a_word)
+                listing.lines.push(Asm::new(op_bits, None, a_word));
+            }
+            ParsedLine::Label(name) => {
+                println!("Found label def {}. Skipping for now.", name);
             }
         };
-        listing.lines.push(asm);
     }
     listing
 }
