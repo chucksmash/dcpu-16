@@ -24,6 +24,7 @@ pub enum Token {
     Ident(String),
     Number(u16),
     Comma,
+    Colon,
     Plus,
 }
 
@@ -132,6 +133,10 @@ fn lex_line<'a>(line: &'a str) -> Result<LexedLine<'a>, ()> {
     let mut tokens = vec![];
     while let Some(ref c) = chars.peek() {
         match c {
+            ':' => {
+                tokens.push(Token::Colon);
+                chars.next();
+            }
             ' ' => {
                 chars.next();
             }
@@ -307,6 +312,16 @@ SET [0x11], 5
                 raw: "SET [0x11], 5",
             },
         ]);
+        assert_eq!(lex(input), expected);
+    }
+
+    #[test]
+    fn lex_with_label() {
+        let input = " WallaWalla   : ";
+        let expected = Ok(vec![LexedLine {
+            tokens: vec![Token::Ident("WallaWalla".to_string()), Token::Colon],
+            raw: " WallaWalla   : ",
+        }]);
         assert_eq!(lex(input), expected);
     }
 }
