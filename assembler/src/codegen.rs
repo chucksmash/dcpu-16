@@ -138,7 +138,7 @@ pub fn val_a_to_bits(val: &ValueA) -> (u16, Option<u16>) {
         Peek => (0x19, None),
         Pick(Number(ref n)) => (0x1a, Some(*n)),
         Sp => (0x1b, None),
-        // TODO: Pc?!?
+        Pc => (0x1c, None),
         Ex => (0x1d, None),
         Num(Number(ref n)) => match n {
             0...30 => ((n + 0x21), None),
@@ -158,7 +158,7 @@ pub fn val_b_to_bits(val: &ValueB) -> (u16, Option<u16>) {
         Peek => (0x19, None),
         Pick(Number(n)) => (0x1a, Some(*n)),
         Sp => (0x1b, None),
-        // TODO: Pc?!?
+        Pc => (0x1c, None),
         Ex => (0x1d, None),
     };
     (unshifted, next_word)

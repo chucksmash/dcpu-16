@@ -42,6 +42,10 @@ fn is_pick(s: &str) -> bool {
     s == "PICK" || s == "pick"
 }
 
+fn is_pc(s: &str) -> bool {
+    s == "PC" || s == "pc"
+}
+
 fn is_sp(s: &str) -> bool {
     s == "SP" || s == "sp"
 }
@@ -205,6 +209,7 @@ pub enum ValueA {
     Peek,
     Pick(Number),
     Sp,
+    Pc,
     Ex,
     Num(Number),
 }
@@ -228,6 +233,9 @@ impl ValueA {
                 } else if is_sp(s) {
                     tokens.next();
                     Ok(ValueA::Sp)
+                } else if is_pc(s) {
+                    tokens.next();
+                    Ok(ValueA::Pc)
                 } else if is_ex(s) {
                     tokens.next();
                     Ok(ValueA::Ex)
@@ -249,6 +257,7 @@ pub enum ValueB {
     Peek,
     Pick(Number),
     Sp,
+    Pc,
     Ex,
 }
 
@@ -271,6 +280,9 @@ impl ValueB {
                 } else if is_sp(s) {
                     tokens.next();
                     Ok(ValueB::Sp)
+                } else if is_pc(s) {
+                    tokens.next();
+                    Ok(ValueB::Pc)
                 } else if is_ex(s) {
                     tokens.next();
                     Ok(ValueB::Ex)
