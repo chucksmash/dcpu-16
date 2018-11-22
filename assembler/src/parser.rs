@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::iter::Peekable;
 use std::slice::Iter;
 
@@ -63,6 +64,7 @@ pub enum ParseError {
     IllegalRegister,
     UnexpectedEndOfLine,
     UnexpectedToken,
+    DuplicateLabelDefinition,
 }
 
 #[derive(Debug)]
@@ -392,8 +394,10 @@ type ParseResult = Result<ParsedLine, ParseError>;
 type PeekableTokens<'a> = Peekable<Iter<'a, Token>>;
 type LexedLines<'a, 'b> = Iter<'a, LexedLine<'b>>;
 
+#[derive(Debug)]
 pub struct Parsed {
     lines: Vec<ParsedLine>,
+    labels: HashMap<String, i32>,
 }
 
 impl Parsed {
@@ -404,10 +408,23 @@ impl Parsed {
 
 pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
     let mut results = vec![];
+    let mut labels = HashMap::new();
     for (idx, line) in lines.enumerate() {
         let parsed = parse_line(&mut line.get_tokens().iter().peekable());
         match parsed {
-            Ok(ok_line) => results.push(ok_line),
+            Ok(ok_line) => {
+                match &ok_line {
+                    ParsedLine::Label(ref s) => {
+                        if let Some(_) = labels.get(s) {
+                            return Err(ParseError::DuplicateLabelDefinition);
+                        } else {
+                            labels.insert(s.clone(), -1);
+                        }
+                    }
+                    _ => {}
+                }
+                results.push(ok_line);
+            }
             Err(err) => {
                 eprintln!(
                     "ERROR: {:?} on line {:04}:
@@ -423,7 +440,10 @@ pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
             }
         }
     }
-    Ok(Parsed { lines: results })
+    Ok(Parsed {
+        lines: results,
+        labels,
+    })
 }
 
 fn parse_line(line: &mut PeekableTokens) -> ParseResult {
