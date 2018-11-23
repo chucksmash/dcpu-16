@@ -27,6 +27,20 @@ fn is_reg(s: &str) -> bool {
     }
 }
 
+fn is_basic_op(s: &str) -> bool {
+    match BasicOpCode::from_str(s) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+fn is_special_op(s: &str) -> bool {
+    match SpecialOpCode::from_str(s) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
 fn is_pop(s: &str) -> bool {
     s == "POP" || s == "pop"
 }
@@ -53,6 +67,19 @@ fn is_sp(s: &str) -> bool {
 
 fn is_ex(s: &str) -> bool {
     s == "EX" || s == "ex"
+}
+
+fn is_reserved(s: &str) -> bool {
+    (is_reg(s)
+        || is_basic_op(s)
+        || is_special_op(s)
+        || is_pop(s)
+        || is_push(s)
+        || is_peek(s)
+        || is_pick(s)
+        || is_pc(s)
+        || is_sp(s)
+        || is_ex(s))
 }
 
 #[derive(Debug)]
