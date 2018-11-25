@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::iter::Peekable;
 use std::slice::Iter;
 
@@ -89,6 +89,7 @@ pub enum ParseError {
     IllegalAValue,
     IllegalInstruction,
     IllegalRegister,
+    ReservedWord,
     UnexpectedEndOfLine,
     UnexpectedToken,
     DuplicateLabelDefinition,
@@ -365,6 +366,7 @@ pub enum Address {
     Reg(Register),
     RegPlusNum(Register, Number),
     Num(Number),
+    Label(LabelRef),
 }
 
 impl Address {
@@ -376,10 +378,16 @@ impl Address {
             .collect::<Vec<_>>();
 
         match *addr_vec.as_slice() {
-            [&Token::Ident(_)] => {
-                let reg = Register::parse(tokens)?;
-                punct_token!(tokens.next(), &Token::CloseBracket);
-                Ok(Address::Reg(reg))
+            [&Token::Ident(ref s)] => {
+                if is_reg(s) {
+                    let reg = Register::parse(tokens)?;
+                    punct_token!(tokens.next(), &Token::CloseBracket);
+                    Ok(Address::Reg(reg))
+                } else {
+                    let label = LabelRef::parse(tokens)?;
+                    punct_token!(tokens.next(), &Token::CloseBracket);
+                    Ok(Address::Label(label))
+                }
             }
             [&Token::Number(_)] => {
                 let num = Number::parse(tokens)?;
@@ -411,6 +419,24 @@ impl Number {
 }
 
 #[derive(Debug)]
+pub struct LabelRef(pub String);
+
+impl LabelRef {
+    fn parse(tokens: &mut PeekableTokens) -> Result<LabelRef, ParseError> {
+        match get!(tokens.next())? {
+            Token::Ident(s) => {
+                if is_reserved(&s) {
+                    Err(ParseError::ReservedWord)
+                } else {
+                    Ok(LabelRef(s.to_string()))
+                }
+            }
+            _ => Err(ParseError::UnexpectedToken),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum ParsedLine {
     Basic(BasicOpCode, ValueB, ValueA),
     Special(SpecialOpCode, ValueA),
@@ -424,7 +450,7 @@ type LexedLines<'a, 'b> = Iter<'a, LexedLine<'b>>;
 #[derive(Debug)]
 pub struct Parsed {
     lines: Vec<ParsedLine>,
-    labels: HashMap<String, i32>,
+    label_defs: HashSet<String>,
 }
 
 impl Parsed {
@@ -435,17 +461,17 @@ impl Parsed {
 
 pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
     let mut results = vec![];
-    let mut labels = HashMap::new();
+    let mut label_defs = HashSet::new();
     for (idx, line) in lines.enumerate() {
         let parsed = parse_line(&mut line.get_tokens().iter().peekable());
         match parsed {
             Ok(ok_line) => {
                 match &ok_line {
                     ParsedLine::Label(ref s) => {
-                        if let Some(_) = labels.get(s) {
+                        if let Some(_) = label_defs.get(s) {
                             return Err(ParseError::DuplicateLabelDefinition);
                         } else {
-                            labels.insert(s.clone(), -1);
+                            label_defs.insert(s.clone());
                         }
                     }
                     _ => {}
@@ -469,7 +495,7 @@ pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
     }
     Ok(Parsed {
         lines: results,
-        labels,
+        label_defs,
     })
 }
 
