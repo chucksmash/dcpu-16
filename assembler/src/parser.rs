@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::iter::Peekable;
 use std::slice::Iter;
 
@@ -26,6 +27,20 @@ fn is_reg(s: &str) -> bool {
     }
 }
 
+fn is_basic_op(s: &str) -> bool {
+    match BasicOpCode::from_str(s) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+fn is_special_op(s: &str) -> bool {
+    match SpecialOpCode::from_str(s) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
 fn is_pop(s: &str) -> bool {
     s == "POP" || s == "pop"
 }
@@ -42,12 +57,29 @@ fn is_pick(s: &str) -> bool {
     s == "PICK" || s == "pick"
 }
 
+fn is_pc(s: &str) -> bool {
+    s == "PC" || s == "pc"
+}
+
 fn is_sp(s: &str) -> bool {
     s == "SP" || s == "sp"
 }
 
 fn is_ex(s: &str) -> bool {
     s == "EX" || s == "ex"
+}
+
+fn is_reserved(s: &str) -> bool {
+    (is_reg(s)
+        || is_basic_op(s)
+        || is_special_op(s)
+        || is_pop(s)
+        || is_push(s)
+        || is_peek(s)
+        || is_pick(s)
+        || is_pc(s)
+        || is_sp(s)
+        || is_ex(s))
 }
 
 #[derive(Debug)]
@@ -57,8 +89,10 @@ pub enum ParseError {
     IllegalAValue,
     IllegalInstruction,
     IllegalRegister,
+    ReservedWord,
     UnexpectedEndOfLine,
     UnexpectedToken,
+    DuplicateLabelDefinition,
 }
 
 #[derive(Debug)]
@@ -205,6 +239,7 @@ pub enum ValueA {
     Peek,
     Pick(Number),
     Sp,
+    Pc,
     Ex,
     Num(Number),
 }
@@ -228,6 +263,9 @@ impl ValueA {
                 } else if is_sp(s) {
                     tokens.next();
                     Ok(ValueA::Sp)
+                } else if is_pc(s) {
+                    tokens.next();
+                    Ok(ValueA::Pc)
                 } else if is_ex(s) {
                     tokens.next();
                     Ok(ValueA::Ex)
@@ -249,6 +287,7 @@ pub enum ValueB {
     Peek,
     Pick(Number),
     Sp,
+    Pc,
     Ex,
 }
 
@@ -271,6 +310,9 @@ impl ValueB {
                 } else if is_sp(s) {
                     tokens.next();
                     Ok(ValueB::Sp)
+                } else if is_pc(s) {
+                    tokens.next();
+                    Ok(ValueB::Pc)
                 } else if is_ex(s) {
                     tokens.next();
                     Ok(ValueB::Ex)
@@ -324,6 +366,7 @@ pub enum Address {
     Reg(Register),
     RegPlusNum(Register, Number),
     Num(Number),
+    Label(LabelRef),
 }
 
 impl Address {
@@ -335,10 +378,16 @@ impl Address {
             .collect::<Vec<_>>();
 
         match *addr_vec.as_slice() {
-            [&Token::Ident(_)] => {
-                let reg = Register::parse(tokens)?;
-                punct_token!(tokens.next(), &Token::CloseBracket);
-                Ok(Address::Reg(reg))
+            [&Token::Ident(ref s)] => {
+                if is_reg(s) {
+                    let reg = Register::parse(tokens)?;
+                    punct_token!(tokens.next(), &Token::CloseBracket);
+                    Ok(Address::Reg(reg))
+                } else {
+                    let label = LabelRef::parse(tokens)?;
+                    punct_token!(tokens.next(), &Token::CloseBracket);
+                    Ok(Address::Label(label))
+                }
             }
             [&Token::Number(_)] => {
                 let num = Number::parse(tokens)?;
@@ -370,6 +419,24 @@ impl Number {
 }
 
 #[derive(Debug)]
+pub struct LabelRef(pub String);
+
+impl LabelRef {
+    fn parse(tokens: &mut PeekableTokens) -> Result<LabelRef, ParseError> {
+        match get!(tokens.next())? {
+            Token::Ident(s) => {
+                if is_reserved(&s) {
+                    Err(ParseError::ReservedWord)
+                } else {
+                    Ok(LabelRef(s.to_string()))
+                }
+            }
+            _ => Err(ParseError::UnexpectedToken),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum ParsedLine {
     Basic(BasicOpCode, ValueB, ValueA),
     Special(SpecialOpCode, ValueA),
@@ -380,8 +447,10 @@ type ParseResult = Result<ParsedLine, ParseError>;
 type PeekableTokens<'a> = Peekable<Iter<'a, Token>>;
 type LexedLines<'a, 'b> = Iter<'a, LexedLine<'b>>;
 
+#[derive(Debug)]
 pub struct Parsed {
     lines: Vec<ParsedLine>,
+    label_defs: HashSet<String>,
 }
 
 impl Parsed {
@@ -392,10 +461,23 @@ impl Parsed {
 
 pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
     let mut results = vec![];
+    let mut label_defs = HashSet::new();
     for (idx, line) in lines.enumerate() {
         let parsed = parse_line(&mut line.get_tokens().iter().peekable());
         match parsed {
-            Ok(ok_line) => results.push(ok_line),
+            Ok(ok_line) => {
+                match &ok_line {
+                    ParsedLine::Label(ref s) => {
+                        if let Some(_) = label_defs.get(s) {
+                            return Err(ParseError::DuplicateLabelDefinition);
+                        } else {
+                            label_defs.insert(s.clone());
+                        }
+                    }
+                    _ => {}
+                }
+                results.push(ok_line);
+            }
             Err(err) => {
                 eprintln!(
                     "ERROR: {:?} on line {:04}:
@@ -411,7 +493,10 @@ pub fn parse(lines: &mut LexedLines) -> Result<Parsed, ParseError> {
             }
         }
     }
-    Ok(Parsed { lines: results })
+    Ok(Parsed {
+        lines: results,
+        label_defs,
+    })
 }
 
 fn parse_line(line: &mut PeekableTokens) -> ParseResult {

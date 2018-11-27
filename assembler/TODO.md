@@ -12,4 +12,4 @@ add them back after I have some nice tests in place:
 
 These are things I didn't mean to leave out but left out anyway:
 
-- The program counter (PC) A/B value type
+- ~~The program counter (PC) A/B value types~~
