@@ -12,12 +12,14 @@ chuck: SET X, 0
 made: this:
 SET Y, 3
 SET A, 0
+SET [480], 900
 
 
 happen:
 SET X, 0    ; change colors
 SET Y, 0xf
 SET A, 1
+SET A, [happen]
 
 SET I, 0    ; counter for device_draw_loop
 ";
